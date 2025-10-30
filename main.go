@@ -46,12 +46,14 @@ func init() {
 
 func main() {
 	var (
-		systemMd    = flag.String("system", "", "Path to system.md")
-		toolConfig  = flag.String("tools", "", "Path to tools.toml")
-		contextDb   = flag.String("db", "", "Path to contextwindow.db")
-		contextName = flag.String("name", "", "Optional conversation name")
-		maxTokens   = flag.Int("maxtokens", 60_000, "Maximum tokens before compacting")
-		forkFrom    = flag.String("fork", "", "Conversation to fork")
+		systemMd      = flag.String("system", "", "Path to system.md")
+		toolConfig    = flag.String("tools", "", "Path to tools.toml")
+		contextDb     = flag.String("db", "", "Path to contextwindow.db")
+		contextName   = flag.String("name", "", "Optional conversation name")
+		maxTokens     = flag.Int("maxtokens", 60_000, "Maximum tokens before compacting")
+		forkFrom      = flag.String("fork", "", "Conversation to fork")
+		modelProvider = flag.String("model", "openai", "LLM provider: openai or claude")
+		modelName     = flag.String("model-name", "", "Specific model name (e.g., claude-haiku-4-5, claude-sonnet-4-5, gpt-5-mini-2025-08-07)")
 	)
 
 	flag.Usage = func() {
@@ -98,9 +100,30 @@ func main() {
 		eprintf("Open %s: %v", path, err)
 	}
 
-	model, err := contextwindow.NewOpenAIResponsesModel(contextwindow.ResponsesModelGPT5Mini)
-	if err != nil {
-		eprintf("Connect to LLM: %v", err)
+	var model contextwindow.Model
+	switch *modelProvider {
+	case "openai":
+		defaultModel := contextwindow.ResponsesModelGPT5Mini
+		if *modelName != "" {
+			model, err = contextwindow.NewOpenAIResponsesModel(*modelName)
+		} else {
+			model, err = contextwindow.NewOpenAIResponsesModel(defaultModel)
+		}
+		if err != nil {
+			eprintf("Connect to OpenAI: %v", err)
+		}
+	case "claude":
+		defaultModel := contextwindow.ModelClaudeHaiku45
+		selectedModel := defaultModel
+		if *modelName != "" {
+			selectedModel = *modelName
+		}
+		model, err = contextwindow.NewClaudeModel(selectedModel)
+		if err != nil {
+			eprintf("Connect to Claude: %v", err)
+		}
+	default:
+		eprintf("Unknown model provider: %s (use 'openai' or 'claude')", *modelProvider)
 	}
 
 	var ag *agent.Agent
